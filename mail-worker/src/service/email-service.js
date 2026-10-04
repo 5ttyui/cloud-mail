@@ -509,25 +509,39 @@ const emailService = {
 	},
 
 	async sendByResend(resendToken, params) {
-		const resend = new Resend(resendToken);
+const sendForm = {
+  from: {
+    email: params.accountEmail,
+    name: params.name
+  },
+  to: params.receiveEmail.map(email => ({ email })),
+  subject: params.subject,
+  text: params.text,
+  html: params.html,
+  attachments: await this.toCloudflareAttachments(params.attachments)
+};
 
-		const sendForm = {
-			from: `${params.name} <${params.accountEmail}>`,
-			to: [...params.receiveEmail],
-			subject: params.subject,
-			text: params.text,
-			html: params.html,
-			attachments: await this.toResendAttachments(params.attachments)
-		};
+// 回复邮件头
+if (params.sendType === 'reply') {
+  sendForm.headers = {
+    'in-reply-to': params.messageId,
+    'references': params.messageId
+  };
+}
 
-		if (params.sendType === 'reply') {
-			sendForm.headers = {
-				'in-reply-to': params.messageId,
-				'references': params.messageId
-			};
-		}
+const resp = await fetch('https://api.mailchannels.net/tx/v1/send', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-auth-token': resendToken
+  },
+  body: JSON.stringify(sendForm)
+});
 
-		return await resend.emails.send(sendForm);
+if (!resp.ok) {
+  throw new Error(`MailChannels send failed: ${await resp.text()}`);
+}
+return await resp.json();
 	},
 
 	async toCloudflareAttachments(attachments) {
