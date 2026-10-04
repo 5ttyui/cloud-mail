@@ -552,7 +552,7 @@ const emailService = {
 		// 保持返回格式和原来一致，兼容后面代码
 		return {
 			data: {
-				id: result.id
+				id: result.id?.replace(/^<|>$/g, '')
 			}
 		};
 	},
