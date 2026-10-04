@@ -9,7 +9,6 @@ import accountService from './account-service';
 import BizError from '../error/biz-error';
 import emailUtils from '../utils/email-utils';
 import fileUtils from '../utils/file-utils';
-import { Resend } from 'resend';
 import attService from './att-service';
 import { parseHTML } from 'linkedom';
 import userService from './user-service';
