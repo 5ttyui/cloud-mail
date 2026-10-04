@@ -507,40 +507,54 @@ const emailService = {
 		};
 	},
 
-	async sendByResend(resendToken, params) {
-const sendForm = {
-  from: {
-    email: params.accountEmail,
-    name: params.name
-  },
-  to: params.receiveEmail.map(email => ({ email })),
-  subject: params.subject,
-  text: params.text,
-  html: params.html,
-  attachments: await this.toCloudflareAttachments(params.attachments)
-};
+		async sendByResend(resendToken, params) {
+		const domain = "tmznnct.ccwu.cc";
+		const formData = new FormData();
+		formData.append("from", `${params.name} <${params.accountEmail}>`);
+		for (const toAddr of params.receiveEmail) {
+			formData.append("to", toAddr);
+		}
+		formData.append("subject", params.subject);
+		if (params.text) formData.append("text", params.text);
+		if (params.html) formData.append("html", params.html);
 
-// 回复邮件头
-if (params.sendType === 'reply') {
-  sendForm.headers = {
-    'in-reply-to': params.messageId,
-    'references': params.messageId
-  };
-}
+		// 处理附件
+		const attachments = await this.toCloudflareAttachments(params.attachments);
+		for (const att of attachments) {
+			const blob = new Blob([att.content], { type: att.type });
+			formData.append("attachment", blob, att.filename);
+		}
 
-const resp = await fetch('https://api.mailchannels.net/tx/v1/send', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'x-auth-token': resendToken
-  },
-  body: JSON.stringify(sendForm)
-});
+		// 回复邮件头
+		const headers = {};
+		if (params.sendType === 'reply' && params.messageId) {
+			headers["In-Reply-To"] = params.messageId;
+			headers["References"] = params.messageId;
+		}
+		if (Object.keys(headers).length > 0) {
+			formData.append("h:In-Reply-To", headers["In-Reply-To"]);
+			formData.append("h:References", headers["References"]);
+		}
 
-if (!resp.ok) {
-  throw new Error(`MailChannels send failed: ${await resp.text()}`);
-}
-return await resp.json();
+		const auth = btoa(`api:${resendToken}`);
+		const resp = await fetch(`https://api.mailgun.net/v3/${domain}/messages`, {
+			method: "POST",
+			headers: {
+				"Authorization": `Basic ${auth}`
+			},
+			body: formData
+		});
+
+		const result = await resp.json();
+		if (!resp.ok) {
+			throw new Error(`Mailgun发送失败: ${JSON.stringify(result)}`);
+		}
+		// 保持返回格式和原来一致，兼容后面代码
+		return {
+			data: {
+				id: result.id
+			}
+		};
 	},
 
 	async toCloudflareAttachments(attachments) {
